@@ -3,6 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>Laravel</title>
 
@@ -120,35 +121,451 @@
 
                 <div class="mt-16">
                     <h2 class="text-xl font-semibold text-gray-900 dark:text-white text-center">Tour Virtual</h2>
+                    
+                    <!-- Navegación del tour -->
+                    <div class="mt-4 text-center">
+                        <a href="{{ route('hotspots.viewer') }}" class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-900 focus:outline-none focus:border-blue-900 focus:ring ring-blue-300 disabled:opacity-25 transition ease-in-out duration-150 mr-2">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                            </svg>
+                            Visor 360° Interactivo
+                        </a>
+                        <a href="{{ route('hotspots.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 active:bg-gray-900 focus:outline-none focus:border-gray-900 focus:ring ring-gray-300 disabled:opacity-25 transition ease-in-out duration-150">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                            Gestionar Hotspots
+                        </a>
+                    </div>
+                    
                     <div class="mt-6 p-6 bg-white dark:bg-gray-800/50 dark:bg-gradient-to-bl from-gray-700/50 via-transparent dark:ring-1 dark:ring-inset dark:ring-white/5 rounded-lg shadow-2xl shadow-gray-500/20 dark:shadow-none">
                         <script src="https://static.kuula.io/embed.js" data-kuula="https://kuula.co/share/hDyFY?logo=1&info=1&fs=1&vr=0&zoom=1&sd=1&thumbs=1" data-width="100%" data-height="640px"></script>
                     </div>
                     
                     <div class="mt-6 p-6 bg-white dark:bg-gray-800/50 dark:bg-gradient-to-bl from-gray-700/50 via-transparent dark:ring-1 dark:ring-inset dark:ring-white/5 rounded-lg shadow-2xl shadow-gray-500/20 dark:shadow-none">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tour Orbix360</h3>
-                        <iframe width="100%" height="400px" allowvr="yes" allow="xr-spatial-tracking" allowfullscreen="yes" frameborder="0" src="https://orbix360.com/t/AHDikXYui1N6GUTLFNJazNJWRST2/5482916876386304/origenes-del-banco?embed=yes"></iframe>
-                    </div>
-                    
-                    <div class="mt-6 p-6 bg-white dark:bg-gray-800/50 dark:bg-gradient-to-bl from-gray-700/50 via-transparent dark:ring-1 dark:ring-inset dark:ring-white/5 rounded-lg shadow-2xl shadow-gray-500/20 dark:shadow-none">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tour Nativo con Pannellum</h3>
                         <div id="panorama" style="width: 100%; height: 400px;"></div>
+                        <div class="mt-4 flex space-x-2">
+                            <button id="addHotspotBtn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Agregar Hotspot</button>
+                            <button id="captureCoordinatesBtn" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 hidden">Capturar Coordenadas Actuales</button>
+                            <button id="cancelHotspotBtn" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 hidden">Cancelar</button>
+                        </div>
+                        
+                        <!-- Formulario para agregar hotspot (inicialmente oculto) -->
+                        <div id="hotspotForm" class="mt-4 p-4 border rounded hidden">
+                            <h4 class="font-medium mb-2">Agregar nuevo punto de interés</h4>
+                            
+                            <!-- Indicador de coordenadas -->
+                            <div id="coordinatesDisplay" class="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                                <strong>Coordenadas capturadas:</strong>
+                                <div class="mt-1">
+                                    Pitch: <span id="displayPitch" class="font-mono">-</span>°, 
+                                    Yaw: <span id="displayYaw" class="font-mono">-</span>°
+                                </div>
+                            </div>
+                            
+                            <div class="mb-2">
+                                <label class="block text-sm font-medium">Título:</label>
+                                <input type="text" id="hotspotTitle" class="w-full p-2 border rounded">
+                            </div>
+                            <div class="mb-2">
+                                <label class="block text-sm font-medium">Descripción:</label>
+                                <textarea id="hotspotText" class="w-full p-2 border rounded"></textarea>
+                            </div>
+                            <input type="hidden" id="hotspotPitch">
+                            <input type="hidden" id="hotspotYaw">
+                            <button id="saveHotspotBtn" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">Guardar</button>
+                        </div>
+                        
                         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css"/>
                         <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
                         <script>
-                            pannellum.viewer('panorama', {
-                                "type": "equirectangular",
-                                "panorama": "{{ asset('storage/360/lote360.jpeg') }}",
-                                "autoLoad": true,
-                                "autoRotate": -2,
-                                "compass": true,
-                                "hotSpots": [
-                                    {
-                                        "pitch": 14.1,
-                                        "yaw": 1.5,
-                                        "type": "info",
-                                        "text": "Punto de interés"
+                            // Variable global para el visor de Pannellum
+                            let viewer;
+                            let addingHotspot = false;
+                            
+                            // Función para cargar los hotspots desde la base de datos
+                            function loadHotspots() {
+                                return fetch('/hotspots-json')
+                                    .then(response => {
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP error! status: ${response.status}`);
+                                        }
+                                        return response.json();
+                                    })
+                                    .then(data => {
+                                        return data;
+                                    })
+                                    .catch(error => {
+                                        console.error('Error cargando hotspots:', error);
+                                        return [];
+                                    });
+                            }
+                            
+                            // Inicializar el visor de Pannellum
+                            async function initPannellum() {
+                                // Intentar cargar hotspots desde la base de datos
+                                let hotspots = [];
+                                try {
+                                    hotspots = await loadHotspots();
+                                } catch (error) {
+                                    console.error('Error cargando hotspots:', error);
+                                    // Usar un hotspot predeterminado si falla la carga
+                                    hotspots = [
+                                        {
+                                            "pitch": 14.1,
+                                            "yaw": 1.5,
+                                            "type": "info",
+                                            "text": "Punto de interés"
+                                        }
+                                    ];
+                                }
+                                
+                                // Crear el visor
+                                viewer = pannellum.viewer('panorama', {
+                                    "type": "equirectangular",
+                                    "panorama": "{{ asset('storage/360/lote360.jpeg') }}",
+                                    "autoLoad": true,
+                                    "autoRotate": -2,
+                                    "compass": true,
+                                    "hotSpots": hotspots
+                                });
+                                
+                                // Esperar a que el visor esté completamente cargado
+                                viewer.on('load', function() {
+                                    console.log('Visor Pannellum cargado correctamente');
+                                    
+                                    // Configurar múltiples eventos para capturar coordenadas
+                                    ['click', 'mousedown', 'mouseup'].forEach(eventType => {
+                                        viewer.on(eventType, function(event) {
+                                            console.log(`Evento ${eventType} detectado. Modo agregar hotspot:`, addingHotspot);
+                                            
+                                            if (addingHotspot && eventType === 'click') {
+                                                console.log('Procesando clic para agregar hotspot...');
+                                                
+                                                // Prevenir otros manejadores
+                                                if (event.preventDefault) event.preventDefault();
+                                                if (event.stopPropagation) event.stopPropagation();
+                                                
+                                                try {
+                                                    // Obtener las coordenadas directamente del visor
+                                                    const pitch = viewer.getPitch();
+                                                    const yaw = viewer.getYaw();
+                                                    
+                                                    console.log('Coordenadas obtenidas del visor:', { pitch, yaw });
+                                                    
+                                                    // Validar que las coordenadas sean números válidos
+                                                    if (typeof pitch === 'number' && typeof yaw === 'number' && 
+                                                        !isNaN(pitch) && !isNaN(yaw)) {
+                                                        
+                                                        console.log('Coordenadas válidas, guardando...');
+                                                        
+                                                        // Guardar las coordenadas en los campos ocultos
+                                                        const pitchField = document.getElementById('hotspotPitch');
+                                                        const yawField = document.getElementById('hotspotYaw');
+                                                        
+                                                        if (pitchField && yawField) {
+                                                            pitchField.value = pitch.toFixed(2);
+                                                            yawField.value = yaw.toFixed(2);
+                                                            
+                                                            // Actualizar el indicador visual
+                                                            document.getElementById('displayPitch').textContent = pitch.toFixed(2);
+                                                            document.getElementById('displayYaw').textContent = yaw.toFixed(2);
+                                                            
+                                                            console.log('Coordenadas guardadas en campos:', {
+                                                                pitch: pitchField.value,
+                                                                yaw: yawField.value
+                                                            });
+                                                            
+                                                            // Mostrar el formulario
+                                                            document.getElementById('hotspotForm').classList.remove('hidden');
+                                                            document.getElementById('cancelHotspotBtn').classList.remove('hidden');
+                                                            document.getElementById('addHotspotBtn').classList.add('hidden');
+                                                            
+                                                            // Desactivar el modo de agregar hotspot
+                                                            addingHotspot = false;
+                                                            
+                                                            // Cambiar cursor de vuelta a normal
+                                                            document.getElementById('panorama').style.cursor = 'default';
+                                                            
+                                                            // Dar feedback visual
+                                                            alert('Coordenadas capturadas exitosamente:\\nPitch: ' + pitch.toFixed(2) + '°\\nYaw: ' + yaw.toFixed(2) + '°\\n\\nAhora completa el formulario.');
+                                                            
+                                                        } else {
+                                                            console.error('No se encontraron los campos de coordenadas');
+                                                            alert('Error: No se encontraron los campos de coordenadas');
+                                                        }
+                                                        
+                                                    } else {
+                                                        console.error('Coordenadas inválidas:', { pitch, yaw, types: { pitch: typeof pitch, yaw: typeof yaw } });
+                                                        alert('Error: No se pudieron obtener coordenadas válidas. Intenta de nuevo.');
+                                                    }
+                                                    
+                                                } catch (error) {
+                                                    console.error('Error obteniendo coordenadas:', error);
+                                                    alert('Error obteniendo coordenadas: ' + error.message);
+                                                }
+                                            }
+                                        });
+                                    });
+                                    
+                                    // MÉTODO ALTERNATIVO: Agregar listener directo al contenedor
+                                    document.getElementById('panorama').addEventListener('click', function(event) {
+                                        console.log('Click directo en panorama detectado. Modo agregar hotspot:', addingHotspot);
+                                        
+                                        if (addingHotspot) {
+                                            console.log('Método alternativo: capturando coordenadas...');
+                                            
+                                            try {
+                                                const pitch = viewer.getPitch();
+                                                const yaw = viewer.getYaw();
+                                                
+                                                console.log('Método alternativo - Coordenadas:', { pitch, yaw });
+                                                
+                                                if (typeof pitch === 'number' && typeof yaw === 'number' && 
+                                                    !isNaN(pitch) && !isNaN(yaw)) {
+                                                    
+                                                    const pitchField = document.getElementById('hotspotPitch');
+                                                    const yawField = document.getElementById('hotspotYaw');
+                                                    
+                                                    if (pitchField && yawField && (!pitchField.value || !yawField.value)) {
+                                                        pitchField.value = pitch.toFixed(2);
+                                                        yawField.value = yaw.toFixed(2);
+                                                        
+                                                        document.getElementById('displayPitch').textContent = pitch.toFixed(2);
+                                                        document.getElementById('displayYaw').textContent = yaw.toFixed(2);
+                                                        
+                                                        console.log('MÉTODO ALTERNATIVO - Coordenadas guardadas:', {
+                                                            pitch: pitchField.value,
+                                                            yaw: yawField.value
+                                                        });
+                                                        
+                                                        document.getElementById('hotspotForm').classList.remove('hidden');
+                                                        document.getElementById('cancelHotspotBtn').classList.remove('hidden');
+                                                        document.getElementById('addHotspotBtn').classList.add('hidden');
+                                                        addingHotspot = false;
+                                                        document.getElementById('panorama').style.cursor = 'default';
+                                                        
+                                                        alert('¡Coordenadas capturadas por método alternativo!\\nPitch: ' + pitch.toFixed(2) + '°\\nYaw: ' + yaw.toFixed(2) + '°');
+                                                    }
+                                                }
+                                            } catch (error) {
+                                                console.error('Error en método alternativo:', error);
+                                            }
+                                        }
+                                    });
+                                });
+                            }
+                            
+                            // Inicializar cuando el DOM esté listo
+                            document.addEventListener('DOMContentLoaded', function() {
+                                initPannellum();
+                                
+                                // Configurar el botón para activar el modo de agregar hotspot
+                                document.getElementById('addHotspotBtn').addEventListener('click', function() {
+                                    console.log('Botón "Agregar Hotspot" clickeado');
+                                    addingHotspot = true;
+                                    console.log('Modo addingHotspot activado:', addingHotspot);
+                                    
+                                    document.getElementById('panorama').style.cursor = 'crosshair';
+                                    
+                                    // Mostrar el botón de captura manual
+                                    document.getElementById('captureCoordinatesBtn').classList.remove('hidden');
+                                    
+                                    // Limpiar campos previos
+                                    document.getElementById('hotspotPitch').value = '';
+                                    document.getElementById('hotspotYaw').value = '';
+                                    
+                                    alert('Modo agregar hotspot activado.\\n\\nOpción 1: Haz clic en la imagen\\nOpción 2: Usa el botón "Capturar Coordenadas Actuales"');
+                                });
+                                
+                                // NUEVO: Botón para captura manual de coordenadas
+                                document.getElementById('captureCoordinatesBtn').addEventListener('click', function() {
+                                    console.log('Botón "Capturar Coordenadas" clickeado');
+                                    
+                                    try {
+                                        const pitch = viewer.getPitch();
+                                        const yaw = viewer.getYaw();
+                                        
+                                        console.log('Captura manual - Coordenadas obtenidas:', { pitch, yaw });
+                                        
+                                        if (typeof pitch === 'number' && typeof yaw === 'number' && 
+                                            !isNaN(pitch) && !isNaN(yaw)) {
+                                            
+                                            // Guardar coordenadas
+                                            document.getElementById('hotspotPitch').value = pitch.toFixed(2);
+                                            document.getElementById('hotspotYaw').value = yaw.toFixed(2);
+                                            
+                                            // Actualizar indicadores visuales
+                                            document.getElementById('displayPitch').textContent = pitch.toFixed(2);
+                                            document.getElementById('displayYaw').textContent = yaw.toFixed(2);
+                                            
+                                            console.log('Captura manual - Coordenadas guardadas exitosamente');
+                                            
+                                            // Mostrar formulario
+                                            document.getElementById('hotspotForm').classList.remove('hidden');
+                                            document.getElementById('cancelHotspotBtn').classList.remove('hidden');
+                                            document.getElementById('addHotspotBtn').classList.add('hidden');
+                                            document.getElementById('captureCoordinatesBtn').classList.add('hidden');
+                                            
+                                            // Desactivar modo
+                                            addingHotspot = false;
+                                            document.getElementById('panorama').style.cursor = 'default';
+                                            
+                                            alert('¡Coordenadas capturadas exitosamente!\\n\\nPitch: ' + pitch.toFixed(2) + '°\\nYaw: ' + yaw.toFixed(2) + '°\\n\\nCompleta el formulario para guardar el hotspot.');
+                                            
+                                        } else {
+                                            console.error('Captura manual - Coordenadas inválidas:', { pitch, yaw });
+                                            alert('Error: No se pudieron obtener coordenadas válidas del visor');
+                                        }
+                                    } catch (error) {
+                                        console.error('Error en captura manual:', error);
+                                        alert('Error al capturar coordenadas: ' + error.message);
                                     }
-                                ]
+                                });
+                                
+                                // Configurar el botón para cancelar
+                                document.getElementById('cancelHotspotBtn').addEventListener('click', function() {
+                                    addingHotspot = false;
+                                    document.getElementById('hotspotForm').classList.add('hidden');
+                                    document.getElementById('cancelHotspotBtn').classList.add('hidden');
+                                    document.getElementById('captureCoordinatesBtn').classList.add('hidden');
+                                    document.getElementById('addHotspotBtn').classList.remove('hidden');
+                                    document.getElementById('panorama').style.cursor = 'default';
+                                    
+                                    // Limpiar campos
+                                    document.getElementById('hotspotTitle').value = '';
+                                    document.getElementById('hotspotText').value = '';
+                                    document.getElementById('hotspotPitch').value = '';
+                                    document.getElementById('hotspotYaw').value = '';
+                                    
+                                    // Limpiar indicadores visuales
+                                    document.getElementById('displayPitch').textContent = '-';
+                                    document.getElementById('displayYaw').textContent = '-';
+                                });
+                                
+                                // Configurar el botón para guardar el hotspot
+                                document.getElementById('saveHotspotBtn').addEventListener('click', function() {
+                                    console.log('Botón "Guardar" clickeado');
+                                    
+                                    const title = document.getElementById('hotspotTitle').value.trim();
+                                    const text = document.getElementById('hotspotText').value.trim();
+                                    const pitchValue = document.getElementById('hotspotPitch').value;
+                                    const yawValue = document.getElementById('hotspotYaw').value;
+                                    
+                                    console.log('Valores del formulario:', {
+                                        title: title,
+                                        text: text,
+                                        pitchValue: pitchValue,
+                                        yawValue: yawValue
+                                    });
+                                    
+                                    // Validaciones básicas
+                                    if (!title || !text) {
+                                        alert('Por favor completa el título y la descripción');
+                                        return;
+                                    }
+                                    
+                                    if (!pitchValue || !yawValue || pitchValue === '' || yawValue === '') {
+                                        console.error('Coordenadas vacías. Campos:', {
+                                            pitchField: document.getElementById('hotspotPitch'),
+                                            yawField: document.getElementById('hotspotYaw'),
+                                            pitchValue: pitchValue,
+                                            yawValue: yawValue
+                                        });
+                                        alert('Error: No se han capturado las coordenadas.\\n\\nPasos para solucionarlo:\\n1. Haz clic en "Agregar Hotspot"\\n2. Mueve la vista panorámica al punto deseado\\n3. Haz clic en la imagen\\n4. Completa este formulario');
+                                        return;
+                                    }
+                                    
+                                    const pitch = parseFloat(pitchValue);
+                                    const yaw = parseFloat(yawValue);
+                                    
+                                    console.log('Coordenadas parseadas:', { pitch, yaw });
+                                    
+                                    // Validar que las coordenadas sean números válidos
+                                    if (isNaN(pitch) || isNaN(yaw)) {
+                                        alert('Error: Coordenadas inválidas. Intenta capturar las coordenadas de nuevo.');
+                                        return;
+                                    }
+                                    
+                                    // Validar rangos
+                                    if (pitch < -90 || pitch > 90) {
+                                        alert('El valor de Pitch debe estar entre -90° y 90°');
+                                        return;
+                                    }
+                                    
+                                    if (yaw < -180 || yaw > 180) {
+                                        alert('El valor de Yaw debe estar entre -180° y 180°');
+                                        return;
+                                    }
+                                    
+                                    // Crear el objeto hotspot
+                                    const hotspot = {
+                                        pitch: pitch,
+                                        yaw: yaw,
+                                        type: 'info',
+                                        title: title,
+                                        text: text
+                                    };
+                                    
+                                    console.log('Enviando hotspot:', hotspot);
+                                    
+                                    // Enviar el hotspot al servidor mediante AJAX
+                                    fetch('/hotspots', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Accept': 'application/json',
+                                            'X-Requested-With': 'XMLHttpRequest',
+                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                        },
+                                        body: JSON.stringify(hotspot)
+                                    })
+                                    .then(response => {
+                                        console.log('Response status:', response.status);
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP error! status: ${response.status}`);
+                                        }
+                                        return response.json();
+                                    })
+                                    .then(data => {
+                                        console.log('Hotspot creado:', data);
+                                        
+                                        if (data.success) {
+                                            // Agregar el hotspot al visor
+                                            viewer.addHotSpot({
+                                                id: 'hotspot-' + Date.now(),
+                                                pitch: pitch,
+                                                yaw: yaw,
+                                                type: 'info',
+                                                text: title + ': ' + text
+                                            });
+                                            
+                                            // Limpiar y ocultar el formulario
+                                            document.getElementById('hotspotTitle').value = '';
+                                            document.getElementById('hotspotText').value = '';
+                                            document.getElementById('hotspotPitch').value = '';
+                                            document.getElementById('hotspotYaw').value = '';
+                                            document.getElementById('hotspotForm').classList.add('hidden');
+                                            document.getElementById('cancelHotspotBtn').classList.add('hidden');
+                                            document.getElementById('addHotspotBtn').classList.remove('hidden');
+                                            
+                                            // Limpiar indicadores visuales
+                                            document.getElementById('displayPitch').textContent = '-';
+                                            document.getElementById('displayYaw').textContent = '-';
+                                            
+                                            alert('Hotspot agregado correctamente');
+                                        } else {
+                                            alert('Error: ' + (data.message || 'No se pudo crear el hotspot'));
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Error guardando el hotspot:', error);
+                                        alert('Error al guardar el hotspot: ' + error.message);
+                                    });
+                                });
                             });
                         </script>
                     </div>

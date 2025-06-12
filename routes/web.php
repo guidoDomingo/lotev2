@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\HotspotController;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,3 +17,13 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+// Ruta de test
+Route::get('/test-api', function () {
+    return view('test-api');
+});
+
+// Rutas para hotspots
+Route::resource('hotspots', HotspotController::class);
+Route::get('/hotspots-json', [HotspotController::class, 'getHotspotsJson'])->name('hotspots.json');
+Route::get('/viewer', [HotspotController::class, 'viewer'])->name('hotspots.viewer');
