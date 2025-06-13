@@ -1,0 +1,4 @@
+# Archivo de prueba para modelo 3D
+# Este archivo simula un modelo 3D para pruebas
+# En una implementación real, aquí iría un archivo .glb o .gltf válido
+Test 3D Model File

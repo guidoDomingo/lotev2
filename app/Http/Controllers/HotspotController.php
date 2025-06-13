@@ -38,44 +38,129 @@ class HotspotController extends Controller
     public function store(Request $request)
     {
         try {
+            // Log incoming request for debugging
+            \Log::info('Hotspot store request', [
+                'all_input' => $request->all(),
+                'files' => $request->allFiles(),
+                'type' => $request->input('type'),
+                'has_model_file' => $request->hasFile('modelFile')
+            ]);
+
             $validated = $request->validate([
                 'pitch' => 'required|numeric|between:-90,90',
                 'yaw' => 'required|numeric|between:-180,180',
-                'type' => 'required|in:info,scene',
+                'type' => 'required|in:info,scene,video,3d,audio',
                 'title' => 'required|string|max:255',
                 'text' => 'required|string',
+                // Campos opcionales según el tipo
+                'sceneId' => 'nullable|string',
+                'videoUrl' => 'nullable|url',
+                'modelFile' => 'nullable|file|max:10240', // 10MB max - removed strict MIME validation
+                'audioFile' => 'nullable|file|mimes:mp3,wav,ogg|max:5120', // 5MB max
             ]);
 
-            $hotspot = Hotspot::create($validated);
+            \Log::info('Validation passed', ['validated' => $validated]);
 
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'success' => true,
-                    'hotspot' => $hotspot,
-                    'message' => 'Hotspot creado exitosamente'
-                ], 201);
+            // Manejar archivos específicos según el tipo
+            if ($validated['type'] === '3d' && $request->hasFile('modelFile')) {
+                \Log::info('Processing 3D model file');
+                $file = $request->file('modelFile');
+                \Log::info('File details', [
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                    'is_valid' => $file->isValid(),
+                    'error' => $file->getError(),
+                    'path' => $file->getPathname(),
+                    'real_path' => $file->getRealPath()
+                ]);
+                
+                if ($file->isValid()) {
+                    // Ensure storage directory exists
+                    $storagePath = storage_path('app/public/models');
+                    if (!file_exists($storagePath)) {
+                        mkdir($storagePath, 0755, true);
+                        \Log::info('Created models directory', ['path' => $storagePath]);
+                    }
+                    
+                    // Use a different approach for file storage
+                    try {
+                        $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9\.\-_]/', '', $file->getClientOriginalName());
+                        
+                        // Use move instead of store when real path is false
+                        if ($file->getRealPath() === false) {
+                            \Log::info('Using alternative file storage method due to false real_path');
+                            $destinationPath = $storagePath . DIRECTORY_SEPARATOR . $fileName;
+                            $file->move($storagePath, $fileName);
+                            $modelPath = 'models/' . $fileName;
+                        } else {
+                            $modelPath = $file->storeAs('models', $fileName, 'public');
+                        }
+                        
+                        \Log::info('File stored successfully', ['path' => $modelPath, 'filename' => $fileName]);
+                        $validated['model_url'] = $modelPath;
+                    } catch (\Exception $fileError) {
+                        \Log::error('File storage error', [
+                            'error' => $fileError->getMessage(),
+                            'trace' => $fileError->getTraceAsString()
+                        ]);
+                        throw new \Exception('Error al guardar el archivo: ' . $fileError->getMessage());
+                    }
+                } else {
+                    $errorMessage = 'El archivo 3D no es válido. Error: ' . $file->getError();
+                    \Log::error($errorMessage);
+                    throw new \Exception($errorMessage);
+                }
             }
 
-            return redirect()->route('hotspots.index')
-                ->with('success', 'Hotspot creado exitosamente');
+            if ($validated['type'] === 'audio' && $request->hasFile('audioFile')) {
+                $file = $request->file('audioFile');
+                if ($file->isValid()) {
+                    $audioPath = $file->store('audio', 'public');
+                    $validated['audio_url'] = $audioPath;
+                } else {
+                    throw new \Exception('El archivo de audio no es válido');
+                }
+            }
+
+            if ($validated['type'] === 'video' && isset($validated['videoUrl'])) {
+                $validated['video_url'] = $validated['videoUrl'];
+            }
+
+            if ($validated['type'] === 'scene' && isset($validated['sceneId'])) {
+                $validated['scene_id'] = $validated['sceneId'];
+            }
+
+            // Limpiar campos que no van a la base de datos
+            unset($validated['sceneId'], $validated['videoUrl']);
+
+            \Log::info('Creating hotspot with data', ['validated' => $validated]);
+            $hotspot = Hotspot::create($validated);
+            \Log::info('Hotspot created successfully', ['hotspot_id' => $hotspot->id]);
+
+            // Always return JSON for AJAX requests
+            return response()->json([
+                'success' => true,
+                'hotspot' => $hotspot,
+                'message' => 'Hotspot creado exitosamente'
+            ], 201);
                 
         } catch (\Illuminate\Validation\ValidationException $e) {
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'errors' => $e->errors(),
-                    'message' => 'Error de validación'
-                ], 422);
-            }
-            throw $e;
+            \Log::error('Validation failed', ['errors' => $e->errors()]);
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors(),
+                'message' => 'Error de validación'
+            ], 422);
         } catch (\Exception $e) {
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Error interno del servidor: ' . $e->getMessage()
-                ], 500);
-            }
-            throw $e;
+            \Log::error('Exception in hotspot store', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Error interno del servidor: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -107,7 +192,7 @@ class HotspotController extends Controller
         $validated = $request->validate([
             'pitch' => 'required|numeric|between:-90,90',
             'yaw' => 'required|numeric|between:-180,180',
-            'type' => 'required|in:info,scene',
+            'type' => 'required|in:info,scene,video,3d,audio',
             'title' => 'required|string|max:255',
             'text' => 'required|string',
         ]);
@@ -150,7 +235,18 @@ class HotspotController extends Controller
     public function getHotspotsJson(): JsonResponse
     {
         try {
-            $hotspots = Hotspot::all(['pitch', 'yaw', 'type', 'title', 'text']);
+            $hotspots = Hotspot::all([
+                'id', 
+                'pitch', 
+                'yaw', 
+                'type', 
+                'title', 
+                'text',
+                'model_url',
+                'audio_url',
+                'video_url',
+                'scene_id'
+            ]);
             
             $formattedHotspots = $hotspots->map(function ($hotspot) {
                 return [
@@ -159,7 +255,11 @@ class HotspotController extends Controller
                     'yaw' => (float) $hotspot->yaw,
                     'type' => $hotspot->type,
                     'title' => $hotspot->title,
-                    'text' => $hotspot->text
+                    'text' => $hotspot->text,
+                    'model_url' => $hotspot->model_url,
+                    'audio_url' => $hotspot->audio_url,
+                    'video_url' => $hotspot->video_url,
+                    'scene_id' => $hotspot->scene_id
                 ];
             });
 

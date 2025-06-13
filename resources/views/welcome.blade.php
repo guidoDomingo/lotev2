@@ -9,9 +9,7 @@
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,600&display=swap" rel="stylesheet" />
-
-        <!-- Styles -->
+        <link href="https://fonts.bunny.net/css?family=figtree:400,600&display=swap" rel="stylesheet" />        <!-- Styles -->
         <style>
             /* Animations for coordinates */
             #displayPitch, #displayYaw {
@@ -65,6 +63,47 @@
                 height: 400px;
                 border-radius: 0.5rem;
                 box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+            }
+
+            /* Hotspot type buttons */
+            .btn-check:checked + .btn-outline-primary {
+                background-color: #0d6efd;
+                border-color: #0d6efd;
+                color: white;
+            }
+
+            .btn-check:checked + .btn-outline-success {
+                background-color: #198754;
+                border-color: #198754;
+                color: white;
+            }
+
+            .btn-check:checked + .btn-outline-warning {
+                background-color: #ffc107;
+                border-color: #ffc107;
+                color: black;
+            }
+
+            .btn-check:checked + .btn-outline-danger {
+                background-color: #dc3545;
+                border-color: #dc3545;
+                color: white;
+            }
+
+            .btn-check:checked + .btn-outline-info {
+                background-color: #0dcaf0;
+                border-color: #0dcaf0;
+                color: black;
+            }
+
+            /* File input styling */
+            .form-control[type="file"] {
+                padding: 0.5rem;
+            }
+
+            /* Additional fields animation */
+            #additionalFields {
+                transition: all 0.3s ease;
             }
         </style>
     </head>
@@ -180,7 +219,47 @@
                                             </div>
                                         </div>
                                     </div>
+                                </div>                                <!-- Hotspot Type Selection -->
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        <i class="fas fa-magic me-1"></i>
+                                        Tipo de Punto
+                                    </label>
+                                    <div class="btn-group w-100" role="group" id="hotspotTypeGroup">
+                                        <input type="radio" class="btn-check" name="hotspotType" id="typeInfo" value="info" checked>
+                                        <label class="btn btn-outline-primary" for="typeInfo">
+                                            <i class="fas fa-info me-1"></i>
+                                            Info
+                                        </label>
+                                        
+                                        <input type="radio" class="btn-check" name="hotspotType" id="typeScene" value="scene">
+                                        <label class="btn btn-outline-success" for="typeScene">
+                                            <i class="fas fa-link me-1"></i>
+                                            Escena
+                                        </label>
+                                        
+                                        <input type="radio" class="btn-check" name="hotspotType" id="type3d" value="3d">
+                                        <label class="btn btn-outline-warning" for="type3d">
+                                            <i class="fas fa-cube me-1"></i>
+                                            3D
+                                        </label>
+                                        
+                                        <input type="radio" class="btn-check" name="hotspotType" id="typeVideo" value="video">
+                                        <label class="btn btn-outline-danger" for="typeVideo">
+                                            <i class="fas fa-play me-1"></i>
+                                            Video
+                                        </label>
+                                        
+                                        <input type="radio" class="btn-check" name="hotspotType" id="typeAudio" value="audio">
+                                        <label class="btn btn-outline-info" for="typeAudio">
+                                            <i class="fas fa-volume-up me-1"></i>
+                                            Audio
+                                        </label>
+                                    </div>
                                 </div>
+
+                                <!-- Additional Fields Container -->
+                                <div id="additionalFields" class="mb-3" style="display: none;"></div>
 
                                 <!-- Form Fields -->
                                 <div class="mb-3">
@@ -213,6 +292,7 @@
 
                                 <input type="hidden" id="hotspotPitch">
                                 <input type="hidden" id="hotspotYaw">
+                                <input type="hidden" id="hotspotType" value="info">
 
                                 <!-- Form Actions -->
                                 <div class="d-flex justify-content-end gap-2">
@@ -289,16 +369,12 @@
             let currentHotspots = [];
             
             // Función para cargar los hotspots desde la base de datos
-            function loadHotspots() {
-                return fetch('/hotspots-json')
+            function loadHotspots() {                return fetch('/hotspots-json')
                     .then(response => {
                         if (!response.ok) {
                             throw new Error(`HTTP error! status: ${response.status}`);
                         }
                         return response.json();
-                    })
-                    .then(data => {
-                        return data;
                     })
                     .catch(error => {
                         console.error('Error cargando hotspots:', error);
@@ -418,10 +494,124 @@
                     });
                 });
             }
-            
-            // Inicializar cuando el DOM esté listo
+              // Inicializar cuando el DOM esté listo
             document.addEventListener('DOMContentLoaded', function() {
                 initPannellum();
+                
+                // Manejar cambios en el tipo de hotspot
+                const typeGroup = document.getElementById('hotspotTypeGroup');
+                if (typeGroup) {
+                    typeGroup.addEventListener('change', function(e) {
+                        if (e.target.type === 'radio') {
+                            const additionalFields = document.getElementById('additionalFields');
+                            document.getElementById('hotspotType').value = e.target.value;
+
+                            if (additionalFields) {
+                                additionalFields.style.display = 'block';
+                                switch(e.target.value) {
+                                    case 'scene':
+                                        additionalFields.innerHTML = `
+                                            <div class="mb-3">
+                                                <label class="form-label">Escena Destino</label>
+                                                <select class="form-select" id="sceneId" required>
+                                                    <option value="">Seleccionar escena...</option>
+                                                    <option value="scene1">Escena 1</option>
+                                                    <option value="scene2">Escena 2</option>
+                                                </select>
+                                            </div>
+                                        `;
+                                        break;
+                                    case 'video':
+                                        additionalFields.innerHTML = `
+                                            <div class="mb-3">
+                                                <label class="form-label">URL del Video</label>
+                                                <input type="url" class="form-control" id="videoUrl" 
+                                                       placeholder="https://..." required>
+                                            </div>
+                                        `;
+                                        break;                                    case '3d':
+                                        additionalFields.innerHTML = `
+                                            <div class="mb-3">
+                                                <label class="form-label">Modelo 3D (GLTF/GLB)</label>
+                                                <input type="file" class="form-control" id="modelFile" 
+                                                       accept=".glb,.gltf" required>
+                                            </div>
+                                            <div class="form-text">
+                                                Formatos soportados: .glb, .gltf (max 10MB)
+                                            </div>
+                                        `;
+                                        
+                                        // Agregar validación de archivo 3D
+                                        const modelInput = document.getElementById('modelFile');
+                                        if (modelInput) {
+                                            modelInput.addEventListener('change', function(e) {
+                                                const file = e.target.files[0];
+                                                if (file) {
+                                                    // Validar tamaño (máximo 10MB)
+                                                    if (file.size > 10 * 1024 * 1024) {
+                                                        alert('El archivo es demasiado grande. El tamaño máximo es 10MB.');
+                                                        this.value = '';
+                                                        return;
+                                                    }
+                                                    
+                                                    // Validar formato
+                                                    const validFormats = ['glb', 'gltf'];
+                                                    const extension = file.name.split('.').pop().toLowerCase();
+                                                    if (!validFormats.includes(extension)) {
+                                                        alert('Formato no válido. Por favor sube un archivo .glb o .gltf');
+                                                        this.value = '';
+                                                        return;
+                                                    }
+                                                    
+                                                    console.log('Archivo 3D válido:', file.name);
+                                                }
+                                            });
+                                        }
+                                        break;                                    case 'audio':
+                                        additionalFields.innerHTML = `
+                                            <div class="mb-3">
+                                                <label class="form-label">Archivo de Audio</label>
+                                                <input type="file" class="form-control" id="audioFile" 
+                                                       accept="audio/*" required>
+                                            </div>
+                                            <div class="form-text">
+                                                Formatos soportados: MP3, WAV, OGG (max 5MB)
+                                            </div>
+                                        `;
+                                        
+                                        // Agregar validación de archivo de audio
+                                        const audioInput = document.getElementById('audioFile');
+                                        if (audioInput) {
+                                            audioInput.addEventListener('change', function(e) {
+                                                const file = e.target.files[0];
+                                                if (file) {
+                                                    // Validar tamaño (máximo 5MB)
+                                                    if (file.size > 5 * 1024 * 1024) {
+                                                        alert('El archivo es demasiado grande. El tamaño máximo es 5MB.');
+                                                        this.value = '';
+                                                        return;
+                                                    }
+                                                    
+                                                    // Validar que sea realmente un archivo de audio
+                                                    if (!file.type.startsWith('audio/')) {
+                                                        alert('Por favor selecciona un archivo de audio válido.');
+                                                        this.value = '';
+                                                        return;
+                                                    }
+                                                    
+                                                    console.log('Archivo de audio válido:', file.name);
+                                                }
+                                            });
+                                        }
+                                        break;
+                                    default:
+                                        additionalFields.style.display = 'none';
+                                        break;
+                                }
+                            }
+                        }
+                    });
+                }
                 
                 // Configurar el botón para activar el modo de agregar hotspot
                 document.getElementById('addHotspotBtn').addEventListener('click', function() {
@@ -499,18 +689,50 @@
                 document.getElementById('cancelFormBtn').addEventListener('click', function() {
                     document.getElementById('cancelHotspotBtn').click();
                 });
-                
-                // Configurar el botón para guardar el hotspot
+                  // Configurar el botón para guardar el hotspot
                 document.getElementById('saveHotspotBtn').addEventListener('click', async function() {
                     const title = document.getElementById('hotspotTitle').value.trim();
                     const text = document.getElementById('hotspotText').value.trim();
                     const pitchValue = document.getElementById('hotspotPitch').value;
                     const yawValue = document.getElementById('hotspotYaw').value;
-                    
-                    // Validaciones básicas
+                    const type = document.getElementById('hotspotType').value;
+                      // Validaciones básicas
                     if (!title || !text) {
                         alert('Por favor completa el título y la descripción');
                         return;
+                    }
+                    
+                    // Validaciones específicas por tipo
+                    if (type === '3d') {
+                        const modelFile = document.getElementById('modelFile')?.files[0];
+                        if (!modelFile) {
+                            alert('Por favor selecciona un archivo de modelo 3D');
+                            return;
+                        }
+                    }
+                    
+                    if (type === 'audio') {
+                        const audioFile = document.getElementById('audioFile')?.files[0];
+                        if (!audioFile) {
+                            alert('Por favor selecciona un archivo de audio');
+                            return;
+                        }
+                    }
+                    
+                    if (type === 'video') {
+                        const videoUrl = document.getElementById('videoUrl')?.value;
+                        if (!videoUrl) {
+                            alert('Por favor ingresa la URL del video');
+                            return;
+                        }
+                    }
+                    
+                    if (type === 'scene') {
+                        const sceneId = document.getElementById('sceneId')?.value;
+                        if (!sceneId) {
+                            alert('Por favor selecciona una escena destino');
+                            return;
+                        }
                     }
                     
                     if (!pitchValue || !yawValue || pitchValue === '' || yawValue === '') {
@@ -538,26 +760,46 @@
                         return;
                     }
                     
-                    // Crear el objeto hotspot
-                    const hotspot = {
-                        pitch: pitch,
-                        yaw: yaw,
-                        type: 'info',
-                        title: title,
-                        text: text
-                    };
-                    
-                    // Enviar el hotspot al servidor mediante AJAX
                     try {
+                        // Crear FormData para manejar archivos
+                        const formData = new FormData();
+                        formData.append('pitch', pitch);
+                        formData.append('yaw', yaw);
+                        formData.append('type', type);
+                        formData.append('title', title);
+                        formData.append('text', text);
+                        formData.append('_token', document.querySelector('meta[name="csrf-token"]').getAttribute('content'));
+
+                        // Agregar campos específicos según el tipo
+                        if (type === 'scene') {
+                            const sceneId = document.getElementById('sceneId')?.value;
+                            if (sceneId) {
+                                formData.append('sceneId', sceneId);
+                            }
+                        } else if (type === '3d') {
+                            const modelFile = document.getElementById('modelFile')?.files[0];
+                            if (modelFile) {
+                                formData.append('modelFile', modelFile);
+                            }
+                        } else if (type === 'audio') {
+                            const audioFile = document.getElementById('audioFile')?.files[0];
+                            if (audioFile) {
+                                formData.append('audioFile', audioFile);
+                            }
+                        } else if (type === 'video') {
+                            const videoUrl = document.getElementById('videoUrl')?.value;
+                            if (videoUrl) {
+                                formData.append('videoUrl', videoUrl);
+                            }
+                        }
+
+                        // Enviar al servidor
                         const response = await fetch('/hotspots', {
                             method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest',
                                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                             },
-                            body: JSON.stringify(hotspot)
+                            body: formData
                         });
 
                         if (!response.ok) {

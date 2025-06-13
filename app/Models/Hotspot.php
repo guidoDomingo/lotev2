@@ -9,5 +9,15 @@ class Hotspot extends Model
 {
     use HasFactory;
     
-    protected $fillable = ['pitch', 'yaw', 'type', 'title', 'text'];
+    protected $fillable = [
+        'pitch', 
+        'yaw', 
+        'type', 
+        'title', 
+        'text',
+        'model_url',
+        'audio_url', 
+        'video_url',
+        'scene_id'
+    ];
 }

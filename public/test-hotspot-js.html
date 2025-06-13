@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Hotspot JavaScript Functions</title>
+</head>
+<body>
+    <h1>Test Hotspot JavaScript Functions</h1>
+    <div id="test-results"></div>
+
+    <script>
+        // Test isValidCoordinates function
+        function isValidCoordinates(pitch, yaw) {
+            // Validate pitch (vertical angle): typically -90 to 90 degrees
+            if (isNaN(pitch) || pitch < -90 || pitch > 90) {
+                return false;
+            }
+            
+            // Validate yaw (horizontal angle): typically -180 to 180 degrees
+            if (isNaN(yaw) || yaw < -180 || yaw > 180) {
+                return false;
+            }
+            
+            return true;
+        }
+
+        function runTests() {
+            const results = [];
+            
+            // Test valid coordinates
+            results.push(`Test 1 - Valid coordinates (0, 0): ${isValidCoordinates(0, 0) ? 'PASS' : 'FAIL'}`);
+            results.push(`Test 2 - Valid coordinates (45, 90): ${isValidCoordinates(45, 90) ? 'PASS' : 'FAIL'}`);
+            results.push(`Test 3 - Valid coordinates (-45, -90): ${isValidCoordinates(-45, -90) ? 'PASS' : 'FAIL'}`);
+            
+            // Test invalid coordinates
+            results.push(`Test 4 - Invalid pitch (100, 0): ${!isValidCoordinates(100, 0) ? 'PASS' : 'FAIL'}`);
+            results.push(`Test 5 - Invalid yaw (0, 200): ${!isValidCoordinates(0, 200) ? 'PASS' : 'FAIL'}`);
+            results.push(`Test 6 - Invalid NaN values: ${!isValidCoordinates(NaN, 0) ? 'PASS' : 'FAIL'}`);
+            
+            document.getElementById('test-results').innerHTML = results.join('<br>');
+        }
+
+        // Run tests when page loads
+        runTests();
+    </script>
+</body>
+</html>
