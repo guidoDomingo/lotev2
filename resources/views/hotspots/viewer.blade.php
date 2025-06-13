@@ -9,7 +9,14 @@
         width: 100%;
         height: 70vh;
         border-radius: 10px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                  <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <strong>${hotspot.title}</strong>
+                    <br>
+                    <small class="text-muted">${hotspot.text}</small>
+                    <br>
+                    <small>
+                        <i class="fas fa-arrows-alt-v"></i> ${hotspot.pitch.toFixed(1)}° | shadow: 0 4px 15px rgba(0,0,0,0.2);
     }
     
     .hotspot-controls {
@@ -175,7 +182,7 @@
 <script>
 let viewer;
 let addMode = false;
-let hotspots = [];
+let currentHotspots = [];
 
 // Inicializar el visor
 document.addEventListener('DOMContentLoaded', function() {
@@ -234,10 +241,10 @@ function loadHotspots() {
             return response.json();
         })
         .then(data => {
-            hotspots = data;
+            currentHotspots = data;
             updateHotspotList();
             addHotspotsToViewer();
-            document.getElementById('hotspotCount').textContent = hotspots.length;
+            document.getElementById('hotspotCount').textContent = currentHotspots.length;
         })
         .catch(error => {
             console.error('Error cargando hotspots:', error);
@@ -246,41 +253,58 @@ function loadHotspots() {
 }
 
 function addHotspotsToViewer() {
-    // Limpiar hotspots existentes
-    viewer.removeAllHotSpots();
-    
-    // Agregar nuevos hotspots
-    hotspots.forEach((hotspot, index) => {
-        viewer.addHotSpot({
-            "pitch": hotspot.pitch,
-            "yaw": hotspot.yaw,
-            "type": hotspot.type,
-            "text": hotspot.text,
-            "id": `hotspot-${index}`,
-            "clickHandlerFunc": function() {
-                highlightHotspot(index);
-            }
+    try {
+        // Remover hotspots existentes uno por uno
+        const scene = viewer.getScene();
+        const config = viewer.getConfig();
+        if (config.hotSpots) {
+            config.hotSpots.forEach(hotspot => {
+                if (hotspot && hotspot.id) {
+                    try {
+                        viewer.removeHotSpot(hotspot.id);
+                    } catch (e) {
+                        console.warn('Error removing hotspot:', hotspot.id, e);
+                    }
+                }
+            });
+        }
+
+        // Agregar nuevos hotspots
+        currentHotspots.forEach((hotspot, index) => {
+            viewer.addHotSpot({
+                "pitch": hotspot.pitch,
+                "yaw": hotspot.yaw,
+                "type": hotspot.type,
+                "text": hotspot.title + ': ' + hotspot.text,
+                "id": `hotspot-${index}`,
+                "clickHandlerFunc": function() {
+                    highlightHotspot(index);
+                }
+            });
         });
-    });
+    } catch (error) {
+        console.error('Error updating hotspots:', error);
+        alert('Error al actualizar los hotspots: ' + error.message);
+    }
 }
 
 function updateHotspotList() {
     const listContainer = document.getElementById('hotspotList');
     listContainer.innerHTML = '';
     
-    if (hotspots.length === 0) {
+    if (currentHotspots.length === 0) {
         listContainer.innerHTML = '<p class="text-muted">No hay hotspots configurados</p>';
         return;
     }
     
-    hotspots.forEach((hotspot, index) => {
+    currentHotspots.forEach((hotspot, index) => {
         const item = document.createElement('div');
         item.className = 'hotspot-item';
         item.id = `hotspot-item-${index}`;
         item.innerHTML = `
             <div class="d-flex justify-content-between align-items-start">
                 <div>
-                    <strong>${hotspot.text}</strong>
+                    <strong>${hotspot.title}</strong>
                     <br>
                     <small>
                         <i class="fas fa-arrows-alt-v"></i> ${hotspot.pitch.toFixed(1)}° | 
@@ -299,9 +323,9 @@ function updateHotspotList() {
 }
 
 function goToHotspot(index) {
-    if (hotspots[index]) {
-        viewer.setPitch(hotspots[index].pitch);
-        viewer.setYaw(hotspots[index].yaw);
+    if (currentHotspots[index]) {
+        viewer.setPitch(currentHotspots[index].pitch);
+        viewer.setYaw(currentHotspots[index].yaw);
         highlightHotspot(index);
     }
 }
@@ -358,7 +382,8 @@ document.getElementById('quickHotspotForm').addEventListener('submit', function(
         yaw: parseFloat(document.getElementById('quickYaw').value),
         _token: document.querySelector('meta[name="csrf-token"]').getAttribute('content')
     };
-      fetch('/hotspots', {
+
+    fetch('/hotspots', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -366,7 +391,8 @@ document.getElementById('quickHotspotForm').addEventListener('submit', function(
             'X-Requested-With': 'XMLHttpRequest',
             'X-CSRF-TOKEN': formData._token
         },
-        body: JSON.stringify(formData)    })
+        body: JSON.stringify(formData)
+    })
     .then(response => {
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);

@@ -286,6 +286,7 @@
             // Variable global para el visor de Pannellum
             let viewer;
             let addingHotspot = false;
+            let currentHotspots = [];
             
             // Función para cargar los hotspots desde la base de datos
             function loadHotspots() {
@@ -304,25 +305,75 @@
                         return [];
                     });
             }
+
+            // Función para actualizar hotspots en el visor
+            async function updateViewer() {
+                try {
+                    // Cargar los nuevos hotspots
+                    const response = await loadHotspots();
+                    
+                    // Remover hotspots existentes uno por uno
+                    if (currentHotspots.length > 0) {
+                        currentHotspots.forEach(hotspot => {
+                            if (hotspot && hotspot.id) {
+                                try {
+                                    viewer.removeHotSpot(hotspot.id);
+                                } catch (e) {
+                                    console.warn('Error removing hotspot:', hotspot.id, e);
+                                }
+                            }
+                        });
+                    }
+
+                    // Limpiar el array de hotspots actuales
+                    currentHotspots = [];                        // Mapear y agregar los nuevos hotspots
+                    response.forEach((hotspot, index) => {
+                        const newHotspot = {
+                            id: 'hotspot-' + hotspot.id,
+                            pitch: parseFloat(hotspot.pitch),
+                            yaw: parseFloat(hotspot.yaw),
+                            type: hotspot.type || 'info',
+                            text: `${hotspot.title}: ${hotspot.text}`
+                        };
+
+                        // Agregar el hotspot al visor
+                        viewer.addHotSpot(newHotspot);
+                        
+                        // Guardar referencia al hotspot
+                        currentHotspots.push(newHotspot);
+                    });
+
+                    return true;
+                } catch (error) {
+                    console.error('Error updating hotspots:', error);
+                    alert('Error al actualizar los hotspots: ' + error.message);
+                    return false;
+                }
+            }
             
             // Inicializar el visor de Pannellum
             async function initPannellum() {
-                // Intentar cargar hotspots desde la base de datos
-                let hotspots = [];
                 try {
-                    hotspots = await loadHotspots();
+                    // Cargar los hotspots existentes
+                    const response = await loadHotspots();
+                    currentHotspots = response.map(hotspot => ({
+                        id: 'hotspot-' + hotspot.id,
+                        pitch: parseFloat(hotspot.pitch),
+                        yaw: parseFloat(hotspot.yaw),
+                        type: hotspot.type || 'info',
+                        text: hotspot.title + ': ' + hotspot.text
+                    }));
                 } catch (error) {
                     console.error('Error cargando hotspots:', error);
-                    hotspots = [
-                        {
-                            "pitch": 14.1,
-                            "yaw": 1.5,
-                            "type": "info",
-                            "text": "Punto de interés"
-                        }
-                    ];
+                    currentHotspots = [{
+                        id: 'hotspot-default',
+                        pitch: 14.1,
+                        yaw: 1.5,
+                        type: "info",
+                        text: "Punto de interés"
+                    }];
                 }
-                
+
                 // Crear el visor
                 viewer = pannellum.viewer('panorama', {
                     "type": "equirectangular",
@@ -330,7 +381,7 @@
                     "autoLoad": true,
                     "autoRotate": -2,
                     "compass": true,
-                    "hotSpots": hotspots
+                    "hotSpots": currentHotspots
                 });
                 
                 // Esperar a que el visor esté completamente cargado
@@ -450,7 +501,7 @@
                 });
                 
                 // Configurar el botón para guardar el hotspot
-                document.getElementById('saveHotspotBtn').addEventListener('click', function() {
+                document.getElementById('saveHotspotBtn').addEventListener('click', async function() {
                     const title = document.getElementById('hotspotTitle').value.trim();
                     const text = document.getElementById('hotspotText').value.trim();
                     const pitchValue = document.getElementById('hotspotPitch').value;
@@ -497,32 +548,27 @@
                     };
                     
                     // Enviar el hotspot al servidor mediante AJAX
-                    fetch('/hotspots', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                        },
-                        body: JSON.stringify(hotspot)
-                    })
-                    .then(response => {
+                    try {
+                        const response = await fetch('/hotspots', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            },
+                            body: JSON.stringify(hotspot)
+                        });
+
                         if (!response.ok) {
                             throw new Error(`HTTP error! status: ${response.status}`);
                         }
-                        return response.json();
-                    })
-                    .then(data => {
+
+                        const data = await response.json();
+
                         if (data.success) {
-                            // Agregar el hotspot al visor
-                            viewer.addHotSpot({
-                                id: 'hotspot-' + Date.now(),
-                                pitch: pitch,
-                                yaw: yaw,
-                                type: 'info',
-                                text: title + ': ' + text
-                            });
+                            // Actualizar todos los hotspots
+                            await updateViewer();
                             
                             // Limpiar y ocultar el formulario
                             document.getElementById('cancelHotspotBtn').click();
@@ -531,11 +577,10 @@
                         } else {
                             alert('Error: ' + (data.message || 'No se pudo crear el hotspot'));
                         }
-                    })
-                    .catch(error => {
+                    } catch (error) {
                         console.error('Error guardando el hotspot:', error);
                         alert('Error al guardar el hotspot: ' + error.message);
-                    });
+                    }
                 });
             });
         </script>

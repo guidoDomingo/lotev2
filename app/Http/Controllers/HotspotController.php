@@ -154,10 +154,12 @@ class HotspotController extends Controller
             
             $formattedHotspots = $hotspots->map(function ($hotspot) {
                 return [
+                    'id' => $hotspot->id,
                     'pitch' => (float) $hotspot->pitch,
                     'yaw' => (float) $hotspot->yaw,
                     'type' => $hotspot->type,
-                    'text' => $hotspot->title
+                    'title' => $hotspot->title,
+                    'text' => $hotspot->text
                 ];
             });
 
