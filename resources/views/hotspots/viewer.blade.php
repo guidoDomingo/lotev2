@@ -9,14 +9,7 @@
         width: 100%;
         height: 70vh;
         border-radius: 10px;
-                  <div class="d-flex justify-content-between align-items-start">
-                <div>
-                    <strong>${hotspot.title}</strong>
-                    <br>
-                    <small class="text-muted">${hotspot.text}</small>
-                    <br>
-                    <small>
-                        <i class="fas fa-arrows-alt-v"></i> ${hotspot.pitch.toFixed(1)}° | shadow: 0 4px 15px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     }
     
     .hotspot-controls {
@@ -334,8 +327,9 @@
 
 @push('scripts')
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://unpkg.com/three@0.144.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.144.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://unpkg.com/three@0.144.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 let viewer;
 let addMode = false;
@@ -513,7 +507,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    throw new Error('HTTP error! status: ' + response.status);
                 }
 
                 const data = await response.json();
@@ -588,11 +582,12 @@ function loadHotspots() {
     fetch('/hotspots-json')
         .then(response => {
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error('HTTP error! status: ' + response.status);
             }
             return response.json();
         })
         .then(data => {
+            console.log('Hotspots loaded from server:', data);
             currentHotspots = data;
             updateHotspotList();
             addHotspotsToViewer();
@@ -628,7 +623,7 @@ function addHotspotsToViewer() {
                 "yaw": hotspot.yaw,
                 "type": hotspot.type,
                 "text": hotspot.title + ': ' + hotspot.text,
-                "id": `hotspot-${index}`,
+                "id": "hotspot-" + index,
                 "clickHandlerFunc": function() {
                     highlightHotspot(index);
                 }
@@ -652,22 +647,20 @@ function updateHotspotList() {
     currentHotspots.forEach((hotspot, index) => {
         const item = document.createElement('div');
         item.className = 'hotspot-item';
-        item.id = `hotspot-item-${index}`;
-        item.innerHTML = `
-            <div class="d-flex justify-content-between align-items-start">
-                <div>
-                    <strong>${hotspot.title}</strong>
-                    <br>
-                    <small>
-                        <i class="fas fa-arrows-alt-v"></i> ${hotspot.pitch.toFixed(1)}° | 
-                        <i class="fas fa-arrows-alt-h"></i> ${hotspot.yaw.toFixed(1)}°
-                    </small>
-                </div>
-                <span class="badge bg-${hotspot.type === 'info' ? 'info' : 'warning'}">
-                    ${hotspot.type}
-                </span>
-            </div>
-        `;
+        item.id = 'hotspot-item-' + index;
+        item.innerHTML = '<div class="d-flex justify-content-between align-items-start">' +
+            '<div>' +
+            '<strong>' + hotspot.title + '</strong>' +
+            '<br>' +
+            '<small>' +
+            '<i class="fas fa-arrows-alt-v"></i> ' + hotspot.pitch.toFixed(1) + '° | ' +
+            '<i class="fas fa-arrows-alt-h"></i> ' + hotspot.yaw.toFixed(1) + '°' +
+            '</small>' +
+            '</div>' +
+            '<span class="badge bg-' + (hotspot.type === 'info' ? 'info' : 'warning') + '">' +
+            hotspot.type +
+            '</span>' +
+            '</div>';
         
         item.addEventListener('click', () => goToHotspot(index));
         listContainer.appendChild(item);
@@ -689,9 +682,34 @@ function highlightHotspot(index) {
     });
     
     // Agregar highlight actual
-    const item = document.getElementById(`hotspot-item-${index}`);
+    const item = document.getElementById('hotspot-item-' + index);
     if (item) {
         item.classList.add('active');
+    }
+    
+    // Manejar diferentes tipos de hotspots
+    const hotspot = currentHotspots[index];
+    console.log('highlightHotspot - hotspot data:', hotspot);
+    if (hotspot) {
+        switch(hotspot.type) {
+            case '3d':
+                console.log('Calling show3DModel with:', hotspot);
+                show3DModel(hotspot);
+                break;
+            case 'video':
+                showVideo(hotspot);
+                break;
+            case 'audio':
+                playAudio(hotspot);
+                break;
+            case 'scene':
+                navigateToScene(hotspot);
+                break;
+            case 'info':
+            default:
+                showHotspotInfo(hotspot);
+                break;
+        }
     }
 }
 
@@ -745,7 +763,7 @@ function resetView() {
 // Función para crear elemento de hotspot personalizado
 function createCustomHotspotElement(hotspotData) {
     const element = document.createElement('div');
-    element.className = `custom-hotspot hotspot-${hotspotData.type}`;
+    element.className = 'custom-hotspot hotspot-' + hotspotData.type;
     
     // Icono basado en el tipo
     const icon = document.createElement('i');
@@ -878,7 +896,7 @@ function updateViewer() {
             pitch: parseFloat(hotspot.pitch),
             yaw: parseFloat(hotspot.yaw),
             type: hotspot.type || 'info',
-            text: `${hotspot.title}: ${hotspot.text}`,
+            text: hotspot.title + ': ' + hotspot.text,
             createTooltipFunc: function(divElement) {
                 divElement.appendChild(createCustomHotspotElement({
                     type: hotspot.type || 'info',
@@ -911,9 +929,9 @@ function handleHotspotClick(hotspot) {
             }
             break;
         case '3d':
-            // Mostrar modelo 3D en AR si está disponible
-            if (hotspot.modelUrl) {
-                showARModel(hotspot.modelUrl);
+            // Mostrar modelo 3D usando la función correcta
+            if (hotspot.model_url) {
+                show3DModel(hotspot);
             }
             break;
         case 'audio':
@@ -926,6 +944,330 @@ function handleHotspotClick(hotspot) {
             // Mostrar información en un modal bonito
             showInfoModal(hotspot);
     }
+}
+
+// Funciones para manejar diferentes tipos de hotspots
+function show3DModel(hotspot) {
+    console.log('=== show3DModel llamada ===');
+    console.log('Hotspot recibido:', hotspot);
+    
+    if (!hotspot.model_url) {
+        console.error('No hay model_url en el hotspot');
+        alert('No hay modelo 3D asociado a este hotspot');
+        return;
+    }
+    
+    console.log('Model URL encontrada:', hotspot.model_url);
+    
+    // Crear modal para el modelo 3D
+    const modalHtml = '<div class="modal fade" id="model3DModal" tabindex="-1">' +
+        '<div class="modal-dialog modal-lg">' +
+        '<div class="modal-content">' +
+        '<div class="modal-header">' +
+        '<h5 class="modal-title">' +
+        '<i class="fas fa-cube me-2"></i>' +
+        hotspot.title +
+        '</h5>' +
+        '<button type="button" class="btn-close" data-bs-dismiss="modal"></button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+        '<div id="model3DContainer" style="width: 100%; height: 400px; background: #f8f9fa; border-radius: 8px; position: relative;">' +
+        '<div class="d-flex justify-content-center align-items-center h-100">' +
+        '<div class="spinner-border text-primary" role="status">' +
+        '<span class="visually-hidden">Cargando modelo 3D...</span>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '<p class="mt-3 mb-0">' + hotspot.text + '</p>' +
+        '</div>' +
+        '<div class="modal-footer">' +
+        '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '</div>';
+    
+    // Remover modal anterior si existe
+    const existingModal = document.getElementById('model3DModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Agregar nuevo modal al DOM
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Mostrar modal
+    const modal = new bootstrap.Modal(document.getElementById('model3DModal'));
+    modal.show();
+    
+    // Cargar modelo 3D
+    load3DModel(hotspot.model_url);
+}
+
+function load3DModel(modelUrl) {
+    console.log('=== Iniciando carga de modelo 3D ===');
+    console.log('URL del modelo:', modelUrl);
+    
+    const container = document.getElementById('model3DContainer');
+    if (!container) {
+        console.error('Container model3DContainer no encontrado');
+        return;
+    }
+    
+    console.log('Container encontrado, dimensiones:', container.offsetWidth, 'x', container.offsetHeight);
+    
+    // Verificar que Three.js esté disponible
+    if (typeof THREE === 'undefined') {
+        console.error('Three.js no está cargado');
+        container.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100 text-danger">' +
+            '<div class="text-center">' +
+            '<i class="fas fa-exclamation-triangle fa-3x mb-3"></i>' +
+            '<p>Error: Three.js no está disponible</p>' +
+            '<small>Verifique que los scripts estén cargados correctamente</small>' +
+            '</div>' +
+            '</div>';
+        return;
+    } else {
+        console.log('Three.js version:', THREE.REVISION);
+    }
+    
+    // Verificar que GLTFLoader esté disponible
+    let LoaderClass = THREE.GLTFLoader;
+    if (typeof LoaderClass === 'undefined' && typeof THREE.GLTF2Loader !== 'undefined') {
+        LoaderClass = THREE.GLTF2Loader;
+    }
+    
+    if (typeof LoaderClass === 'undefined') {
+        console.error('GLTFLoader no está disponible');
+        console.log('THREE object keys:', Object.keys(THREE));
+        container.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100 text-danger">' +
+            '<div class="text-center">' +
+            '<i class="fas fa-exclamation-triangle fa-3x mb-3"></i>' +
+            '<p>Error: GLTFLoader no está disponible</p>' +
+            '<small>Verifique que GLTFLoader.js esté cargado</small>' +
+            '<br><small>Three.js keys: ' + Object.keys(THREE).join(', ') + '</small>' +
+            '</div>' +
+            '</div>';
+        return;
+    } else {
+        console.log('GLTFLoader disponible');
+    }
+    
+    console.log('Three.js y GLTFLoader disponibles');
+    console.log('Window location:', window.location.href);
+    console.log('Base URL:', window.location.origin);
+    
+    // Crear escena Three.js
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf0f0f0);
+    console.log('Escena creada');
+    
+    // Crear cámara
+    const camera = new THREE.PerspectiveCamera(75, container.offsetWidth / container.offsetHeight, 0.1, 1000);
+    camera.position.set(0, 1, 3);
+    console.log('Cámara creada');
+    
+    // Crear renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.offsetWidth, container.offsetHeight);
+    console.log('Renderer creado');
+    
+    // Limpiar container y agregar canvas
+    container.innerHTML = '';
+    container.appendChild(renderer.domElement);
+    console.log('Canvas agregado al container');
+    
+    // Agregar luces
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+    scene.add(ambientLight);
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(1, 1, 1);
+    scene.add(directionalLight);
+    console.log('Luces agregadas');
+    
+    // Renderizar escena básica primero
+    renderer.render(scene, camera);
+    console.log('Escena básica renderizada');
+    
+    // Cargar modelo GLTF
+    const loader = new LoaderClass();
+    
+    // Construir path del modelo - probando diferentes rutas
+    const modelPath1 = '/storage/' + modelUrl;
+    const modelPath2 = '/lotev2/public/storage/' + modelUrl;
+    const modelPath3 = window.location.origin + '/lotev2/public/storage/' + modelUrl;
+    
+    console.log('Intentando cargar modelo desde múltiples rutas:');
+    console.log('Path 1:', modelPath1);
+    console.log('Path 2:', modelPath2);
+    console.log('Path 3:', modelPath3);
+    
+    // Intentar cargar con la primera ruta
+    let currentPath = modelPath1;
+    
+    // Función para intentar cargar con múltiples rutas
+    function tryLoadModel(paths, index) {
+        if (typeof index === 'undefined') index = 0;
+        
+        if (index >= paths.length) {
+            console.error('No se pudo cargar el modelo desde ninguna ruta');
+            container.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100 text-danger">' +
+                '<div class="text-center">' +
+                '<i class="fas fa-exclamation-triangle fa-3x mb-3"></i>' +
+                '<p>Error al cargar el modelo 3D</p>' +
+                '<small>No se pudo acceder al archivo desde ninguna ruta</small>' +
+                '</div>' +
+                '</div>';
+            return;
+        }
+        
+        const currentPath = paths[index];
+        console.log('Intentando cargar desde: ' + currentPath);
+        
+        loader.load(
+            currentPath,
+            function(gltf) {
+                console.log('Modelo cargado exitosamente desde:', currentPath);
+                const model = gltf.scene;
+                
+                // Centrar y escalar modelo
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                
+                console.log('Dimensiones del modelo:', size);
+                console.log('Centro del modelo:', center);
+                
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const scale = 2 / maxDim;
+                
+                model.scale.multiplyScalar(scale);
+                model.position.sub(center.multiplyScalar(scale));
+                
+                scene.add(model);
+                console.log('Modelo agregado a la escena');
+                
+                // Función de animación
+                function animate() {
+                    requestAnimationFrame(animate);
+                    
+                    // Rotar modelo automáticamente
+                    model.rotation.y += 0.005;
+                    
+                    renderer.render(scene, camera);
+                }
+                
+                console.log('Iniciando animación');
+                animate();
+            },
+            function(progress) {
+                const percent = (progress.loaded / progress.total * 100);
+                console.log('Progreso de carga desde ' + currentPath + ':', percent + '%');
+            },
+            function(error) {
+                console.error('Error cargando desde ' + currentPath + ':', error);
+                // Intentar con la siguiente ruta
+                tryLoadModel(paths, index + 1);
+            }
+        );
+    }
+    
+    // Intentar cargar el modelo
+    const possiblePaths = [modelPath1, modelPath2, modelPath3];
+    tryLoadModel(possiblePaths);
+}
+
+function showVideo(hotspot) {
+    if (!hotspot.video_url) {
+        alert('No hay video asociado a este hotspot');
+        return;
+    }
+    
+    // Abrir video en modal o nueva ventana
+    const videoModal = '<div class="modal fade" id="videoModal" tabindex="-1">' +
+        '<div class="modal-dialog modal-lg">' +
+        '<div class="modal-content">' +
+        '<div class="modal-header">' +
+        '<h5 class="modal-title">' +
+        '<i class="fas fa-play me-2"></i>' +
+        hotspot.title +
+        '</h5>' +
+        '<button type="button" class="btn-close" data-bs-dismiss="modal"></button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+        '<div class="ratio ratio-16x9">' +
+        '<iframe src="' + hotspot.video_url + '" allowfullscreen></iframe>' +
+        '</div>' +
+        '<p class="mt-3 mb-0">' + hotspot.text + '</p>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '</div>';
+    
+    // Remover modal anterior
+    const existingModal = document.getElementById('videoModal');
+    if (existingModal) existingModal.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', videoModal);
+    const modal = new bootstrap.Modal(document.getElementById('videoModal'));
+    modal.show();
+}
+
+function playAudio(hotspot) {
+    if (!hotspot.audio_url) {
+        alert('No hay audio asociado a este hotspot');
+        return;
+    }
+    
+    // Crear reproductor de audio
+    const audioPlayer = new Audio('/storage/' + hotspot.audio_url);
+    audioPlayer.controls = true;
+    audioPlayer.play();
+    
+    // Mostrar notificación
+    alert('Reproduciendo audio: ' + hotspot.title);
+}
+
+function navigateToScene(hotspot) {
+    if (!hotspot.scene_id) {
+        alert('No hay escena asociada a este hotspot');
+        return;
+    }
+    
+    // Aquí puedes implementar la navegación a otra escena
+    alert('Navegando a escena: ' + hotspot.scene_id);
+}
+
+function showHotspotInfo(hotspot) {
+    // Mostrar información básica del hotspot
+    const infoModal = '<div class="modal fade" id="infoModal" tabindex="-1">' +
+        '<div class="modal-dialog">' +
+        '<div class="modal-content">' +
+        '<div class="modal-header">' +
+        '<h5 class="modal-title">' +
+        '<i class="fas fa-info me-2"></i>' +
+        hotspot.title +
+        '</h5>' +
+        '<button type="button" class="btn-close" data-bs-dismiss="modal"></button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+        '<p>' + hotspot.text + '</p>' +
+        '</div>' +
+        '<div class="modal-footer">' +
+        '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '</div>';
+    
+    // Remover modal anterior
+    const existingModal = document.getElementById('infoModal');
+    if (existingModal) existingModal.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', infoModal);
+    const modal = new bootstrap.Modal(document.getElementById('infoModal'));
+    modal.show();
 }
 </script>
 @endpush
