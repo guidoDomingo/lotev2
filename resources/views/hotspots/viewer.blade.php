@@ -996,12 +996,16 @@ function show3DModel(hotspot) {
     // Agregar nuevo modal al DOM
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    // Mostrar modal
-    const modal = new bootstrap.Modal(document.getElementById('model3DModal'));
-    modal.show();
+    // Mostrar modal y cargar modelo cuando esté visible
+    const modalElement = document.getElementById('model3DModal');
+    const modal = new bootstrap.Modal(modalElement);
     
-    // Cargar modelo 3D
-    load3DModel(hotspot.model_url);
+    modalElement.addEventListener('shown.bs.modal', function () {
+        // Cargar modelo 3D después de que el modal esté visible
+        load3DModel(hotspot.model_url);
+    });
+    
+    modal.show();
 }
 
 function load3DModel(modelUrl) {
@@ -1016,6 +1020,15 @@ function load3DModel(modelUrl) {
     
     console.log('Container encontrado, dimensiones:', container.offsetWidth, 'x', container.offsetHeight);
     
+    // Asegurarse de que el contenedor tenga dimensiones antes de inicializar Three.js
+    container.style.width = '100%';
+    container.style.height = '400px';
+    
+    // Pequeño retraso para asegurar que el DOM se actualice
+    setTimeout(() => {
+        console.log('Dimensiones actualizadas:', container.offsetWidth, 'x', container.offsetHeight);
+    }, 0);
+    
     // Verificar que Three.js esté disponible
     if (typeof THREE === 'undefined') {
         console.error('Three.js no está cargado');
@@ -1027,155 +1040,137 @@ function load3DModel(modelUrl) {
             '</div>' +
             '</div>';
         return;
-    } else {
-        console.log('Three.js version:', THREE.REVISION);
     }
-    
-    // Verificar que GLTFLoader esté disponible
-    let LoaderClass = THREE.GLTFLoader;
-    if (typeof LoaderClass === 'undefined' && typeof THREE.GLTF2Loader !== 'undefined') {
-        LoaderClass = THREE.GLTF2Loader;
-    }
-    
-    if (typeof LoaderClass === 'undefined') {
-        console.error('GLTFLoader no está disponible');
-        console.log('THREE object keys:', Object.keys(THREE));
-        container.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100 text-danger">' +
-            '<div class="text-center">' +
-            '<i class="fas fa-exclamation-triangle fa-3x mb-3"></i>' +
-            '<p>Error: GLTFLoader no está disponible</p>' +
-            '<small>Verifique que GLTFLoader.js esté cargado</small>' +
-            '<br><small>Three.js keys: ' + Object.keys(THREE).join(', ') + '</small>' +
-            '</div>' +
-            '</div>';
-        return;
-    } else {
-        console.log('GLTFLoader disponible');
-    }
-    
-    console.log('Three.js y GLTFLoader disponibles');
-    console.log('Window location:', window.location.href);
-    console.log('Base URL:', window.location.origin);
     
     // Crear escena Three.js
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf0f0f0);
-    console.log('Escena creada');
+    scene.background = new THREE.Color(0x303030); // Fondo más oscuro para mejor contraste
     
-    // Crear cámara
-    const camera = new THREE.PerspectiveCamera(75, container.offsetWidth / container.offsetHeight, 0.1, 1000);
-    camera.position.set(0, 1, 3);
-    console.log('Cámara creada');
+    // Mejorar configuración de cámara
+    const aspect = container.offsetWidth / container.offsetHeight;
+    const camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000); // Campo de visión más amplio
+    camera.position.set(10, 5, 10);
+    camera.lookAt(0, 0, 0);
     
-    // Crear renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Mejorar configuración del renderer
+    const renderer = new THREE.WebGLRenderer({ 
+        antialias: true,
+        alpha: true 
+    });
     renderer.setSize(container.offsetWidth, container.offsetHeight);
-    console.log('Renderer creado');
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.outputEncoding = THREE.sRGBEncoding;
     
     // Limpiar container y agregar canvas
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
-    console.log('Canvas agregado al container');
     
-    // Agregar luces
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+    // Mejorar iluminación
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Luz ambiente más intensa
     scene.add(ambientLight);
     
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(1, 1, 1);
-    scene.add(directionalLight);
-    console.log('Luces agregadas');
+    // Luz principal desde arriba-frente
+    const mainLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    mainLight.position.set(5, 10, 5);
+    mainLight.castShadow = true;
+    scene.add(mainLight);
     
-    // Renderizar escena básica primero
-    renderer.render(scene, camera);
-    console.log('Escena básica renderizada');
+    // Luz de relleno desde abajo-atrás
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    fillLight.position.set(-5, -2, -5);
+    scene.add(fillLight);
     
-    // Cargar modelo GLTF
-    const loader = new LoaderClass();
+    // Luz lateral para definir bordes
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
+    rimLight.position.set(5, 2, -5);
+    scene.add(rimLight);
     
-    // Construir path del modelo - probando diferentes rutas
-    const modelPath1 = '/storage/' + modelUrl;
-    const modelPath2 = '/lotev2/public/storage/' + modelUrl;
-    const modelPath3 = window.location.origin + '/lotev2/public/storage/' + modelUrl;
+    // Agregar OrbitControls
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.screenSpacePanning = false;
+    controls.minDistance = 1;
+    controls.maxDistance = 50;
+    controls.maxPolarAngle = Math.PI / 2;
     
-    console.log('Intentando cargar modelo desde múltiples rutas:');
-    console.log('Path 1:', modelPath1);
-    console.log('Path 2:', modelPath2);
-    console.log('Path 3:', modelPath3);
-    
-    // Intentar cargar con la primera ruta
-    let currentPath = modelPath1;
-    
-    // Función para intentar cargar con múltiples rutas
-    function tryLoadModel(paths, index) {
-        if (typeof index === 'undefined') index = 0;
+    // Manejar redimensionamiento
+    window.addEventListener('resize', onWindowResize, false);
+    function onWindowResize() {
+        const width = container.offsetWidth;
+        const height = container.offsetHeight;
         
-        if (index >= paths.length) {
-            console.error('No se pudo cargar el modelo desde ninguna ruta');
+        if (width > 0 && height > 0) {
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height, true);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            console.log('Renderer redimensionado a:', width, 'x', height);
+        }
+    }
+    
+    // Llamar a onWindowResize una vez para asegurar el tamaño inicial correcto
+    onWindowResize();
+    
+    // Función de animación
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+    animate();
+    
+    // Cargar modelo
+    const loader = new THREE.GLTFLoader();
+    const currentPath = '/storage/' + modelUrl;
+    
+    loader.load(
+        currentPath,
+        function(gltf) {
+            console.log('Modelo cargado exitosamente:', gltf);
+            const model = gltf.scene;
+            
+            // Centrar y escalar modelo
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            
+            // Calcular la escala para que el modelo quepa bien en la vista
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const scale = 5 / maxDim; // Aumentamos la escala para mejor visibilidad
+            model.scale.multiplyScalar(scale);
+            
+            // Centrar el modelo en (0,0,0)
+            model.position.copy(center).multiplyScalar(-scale);
+            
+            scene.add(model);
+            
+            // Ajustar la cámara para una mejor vista del modelo
+            const distance = Math.max(size.x, size.y, size.z) * 2;
+            camera.position.set(distance, distance / 2, distance);
+            controls.target.set(0, 0, 0);
+            
+            // Actualizar controles y realizar un render inicial
+            controls.update();
+            renderer.render(scene, camera);
+            
+            console.log('Modelo agregado y configurado en la escena');
+        },
+        function(progress) {
+            const percent = (progress.loaded / progress.total * 100);
+            console.log('Progreso de carga:', percent.toFixed(2) + '%');
+        },
+        function(error) {
+            console.error('Error cargando el modelo:', error);
             container.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100 text-danger">' +
                 '<div class="text-center">' +
                 '<i class="fas fa-exclamation-triangle fa-3x mb-3"></i>' +
                 '<p>Error al cargar el modelo 3D</p>' +
-                '<small>No se pudo acceder al archivo desde ninguna ruta</small>' +
+                '<small>' + error.message + '</small>' +
                 '</div>' +
                 '</div>';
-            return;
         }
-        
-        const currentPath = paths[index];
-        console.log('Intentando cargar desde: ' + currentPath);
-        
-        loader.load(
-            currentPath,
-            function(gltf) {
-                console.log('Modelo cargado exitosamente desde:', currentPath);
-                const model = gltf.scene;
-                
-                // Centrar y escalar modelo
-                const box = new THREE.Box3().setFromObject(model);
-                const center = box.getCenter(new THREE.Vector3());
-                const size = box.getSize(new THREE.Vector3());
-                
-                console.log('Dimensiones del modelo:', size);
-                console.log('Centro del modelo:', center);
-                
-                const maxDim = Math.max(size.x, size.y, size.z);
-                const scale = 2 / maxDim;
-                
-                model.scale.multiplyScalar(scale);
-                model.position.sub(center.multiplyScalar(scale));
-                
-                scene.add(model);
-                console.log('Modelo agregado a la escena');
-                
-                // Función de animación
-                function animate() {
-                    requestAnimationFrame(animate);
-                    
-                    // Rotar modelo automáticamente
-                    model.rotation.y += 0.005;
-                    
-                    renderer.render(scene, camera);
-                }
-                
-                console.log('Iniciando animación');
-                animate();
-            },
-            function(progress) {
-                const percent = (progress.loaded / progress.total * 100);
-                console.log('Progreso de carga desde ' + currentPath + ':', percent + '%');
-            },
-            function(error) {
-                console.error('Error cargando desde ' + currentPath + ':', error);
-                // Intentar con la siguiente ruta
-                tryLoadModel(paths, index + 1);
-            }
-        );
-    }
-    
-    // Intentar cargar el modelo
-    const possiblePaths = [modelPath1, modelPath2, modelPath3];
-    tryLoadModel(possiblePaths);
+    );
 }
 
 function showVideo(hotspot) {
