@@ -469,8 +469,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         const modelFile = modelFileInput.files[0];
                         console.log('Model file found:', modelFile.name, 'Size:', modelFile.size);
                         formData.append('modelFile', modelFile);
+                        console.log('Agregando archivo modelFile:', modelFile);
                     } else {
-                        console.log('No model file selected or input not found');
+                        alert('Por favor selecciona un archivo 3D antes de guardar');
+                        return;
                     }
                 } else if (type === 'audio') {
                     const audioFileInput = document.getElementById('audioFile');
@@ -494,20 +496,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Debug: Log all form data
                 console.log('Form data being sent:');
                 for (let [key, value] of formData.entries()) {
-                    console.log(key, ':', value);
+                    if (value instanceof File) {
+                        console.log(key, ':', value.name, '(', value.size, 'bytes)');
+                    } else {
+                        console.log(key, ':', value);
+                    }
                 }
 
                 // Enviar al servidor
                 const response = await fetch('/hotspots', {
                     method: 'POST',
                     headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Accept': 'application/json'
                     },
-                    body: formData
+                    body: formData,
+                    credentials: 'same-origin'
                 });
 
                 if (!response.ok) {
-                    throw new Error('HTTP error! status: ' + response.status);
+                    const error = await response.json();
+                    throw new Error(error.message || 'Error al guardar el hotspot: ' + response.status);
                 }
 
                 const data = await response.json();
@@ -961,7 +970,7 @@ function show3DModel(hotspot) {
     
     // Crear modal para el modelo 3D
     const modalHtml = '<div class="modal fade" id="model3DModal" tabindex="-1">' +
-        '<div class="modal-dialog modal-lg">' +
+        '<div class="modal-dialog modal-xl" style="max-width: 90vw;">' +
         '<div class="modal-content">' +
         '<div class="modal-header">' +
         '<h5 class="modal-title">' +
@@ -970,8 +979,8 @@ function show3DModel(hotspot) {
         '</h5>' +
         '<button type="button" class="btn-close" data-bs-dismiss="modal"></button>' +
         '</div>' +
-        '<div class="modal-body">' +
-        '<div id="model3DContainer" style="width: 100%; height: 400px; background: #f8f9fa; border-radius: 8px; position: relative;">' +
+        '<div class="modal-body p-2">' +
+        '<div id="model3DContainer" style="width: 100%; height: 600px; background: #f8f9fa; border-radius: 8px; position: relative;">' +
         '<div class="d-flex justify-content-center align-items-center h-100">' +
         '<div class="spinner-border text-primary" role="status">' +
         '<span class="visually-hidden">Cargando modelo 3D...</span>' +
@@ -1022,7 +1031,7 @@ function load3DModel(modelUrl) {
     
     // Asegurarse de que el contenedor tenga dimensiones antes de inicializar Three.js
     container.style.width = '100%';
-    container.style.height = '400px';
+    container.style.height = '600px';
     
     // Pequeño retraso para asegurar que el DOM se actualice
     setTimeout(() => {
@@ -1137,7 +1146,7 @@ function load3DModel(modelUrl) {
             
             // Calcular la escala para que el modelo quepa bien en la vista
             const maxDim = Math.max(size.x, size.y, size.z);
-            const scale = 5 / maxDim; // Aumentamos la escala para mejor visibilidad
+            const scale = 30 / maxDim; // Aumentamos significativamente la escala para mejor visibilidad
             model.scale.multiplyScalar(scale);
             
             // Centrar el modelo en (0,0,0)
@@ -1145,9 +1154,9 @@ function load3DModel(modelUrl) {
             
             scene.add(model);
             
-            // Ajustar la cámara para una mejor vista del modelo
-            const distance = Math.max(size.x, size.y, size.z) * 2;
-            camera.position.set(distance, distance / 2, distance);
+            // Ajustar la cámara para una mejor vista del modelo con la nueva escala
+            const distance = Math.max(size.x, size.y, size.z) * 1.5; // Reducimos la distancia para que se vea más cerca
+            camera.position.set(distance, distance / 1.5, distance);
             controls.target.set(0, 0, 0);
             
             // Actualizar controles y realizar un render inicial

@@ -55,7 +55,7 @@ class HotspotController extends Controller
                 // Campos opcionales según el tipo
                 'sceneId' => 'nullable|string',
                 'videoUrl' => 'nullable|url',
-                'modelFile' => 'nullable|file|max:10240', // 10MB max - removed strict MIME validation
+                //'modelFile' => 'nullable|file|max:10240', // 10MB max - removed strict MIME validation
                 'audioFile' => 'nullable|file|mimes:mp3,wav,ogg|max:5120', // 5MB max
             ]);
 
