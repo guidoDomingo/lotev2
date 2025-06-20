@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Hotspot;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 class HotspotController extends Controller
 {
@@ -55,7 +58,7 @@ class HotspotController extends Controller
                 // Campos opcionales según el tipo
                 'sceneId' => 'nullable|string',
                 'videoUrl' => 'nullable|url',
-                //'modelFile' => 'nullable|file|max:10240', // 10MB max - removed strict MIME validation
+                'modelFile' => 'nullable|file|max:10240', // 10MB max - removed strict MIME validation
                 'audioFile' => 'nullable|file|mimes:mp3,wav,ogg|max:5120', // 5MB max
             ]);
 
@@ -63,16 +66,16 @@ class HotspotController extends Controller
 
             // Manejar archivos específicos según el tipo
             if ($validated['type'] === '3d' && $request->hasFile('modelFile')) {
-                \Log::info('Processing 3D model file');
                 $file = $request->file('modelFile');
-                \Log::info('File details', [
-                    'original_name' => $file->getClientOriginalName(),
-                    'mime_type' => $file->getMimeType(),
+                
+                // Verificar el tamaño del archivo antes de procesarlo
+                if ($file->getSize() > 100 * 1024 * 1024) { // 100MB límite
+                    throw new \Exception('El archivo es demasiado grande. Máximo 100MB permitidos.');
+                }
+                
+                \Log::info('Processing 3D model file', [
                     'size' => $file->getSize(),
-                    'is_valid' => $file->isValid(),
-                    'error' => $file->getError(),
-                    'path' => $file->getPathname(),
-                    'real_path' => $file->getRealPath()
+                    'mime_type' => $file->getMimeType()
                 ]);
                 
                 if ($file->isValid()) {
@@ -85,17 +88,16 @@ class HotspotController extends Controller
                     
                     // Use a different approach for file storage
                     try {
-                        $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9\.\-_]/', '', $file->getClientOriginalName());
+                        // Generar un nombre de archivo corto y único usando hash
+                        $extension = $file->getClientOriginalExtension();
+                        $hash = md5(uniqid() . $file->getClientOriginalName());
+                        $fileName = substr($hash, 0, 10) . '.' . $extension;
                         
-                        // Use move instead of store when real path is false
-                        if ($file->getRealPath() === false) {
-                            \Log::info('Using alternative file storage method due to false real_path');
-                            $destinationPath = $storagePath . DIRECTORY_SEPARATOR . $fileName;
-                            $file->move($storagePath, $fileName);
-                            $modelPath = 'models/' . $fileName;
-                        } else {
-                            $modelPath = $file->storeAs('models', $fileName, 'public');
-                        }
+                        // Almacenar usando el disco público para mejor rendimiento
+                        $modelPath = $file->storeAs('models', $fileName, [
+                            'disk' => 'public',
+                            'visibility' => 'public'
+                        ]);
                         
                         \Log::info('File stored successfully', ['path' => $modelPath, 'filename' => $fileName]);
                         $validated['model_url'] = $modelPath;
@@ -235,32 +237,37 @@ class HotspotController extends Controller
     public function getHotspotsJson(): JsonResponse
     {
         try {
-            $hotspots = Hotspot::all([
-                'id', 
-                'pitch', 
-                'yaw', 
-                'type', 
-                'title', 
-                'text',
-                'model_url',
-                'audio_url',
-                'video_url',
-                'scene_id'
-            ]);
-            
-            $formattedHotspots = $hotspots->map(function ($hotspot) {
-                return [
-                    'id' => $hotspot->id,
-                    'pitch' => (float) $hotspot->pitch,
-                    'yaw' => (float) $hotspot->yaw,
-                    'type' => $hotspot->type,
-                    'title' => $hotspot->title,
-                    'text' => $hotspot->text,
-                    'model_url' => $hotspot->model_url,
-                    'audio_url' => $hotspot->audio_url,
-                    'video_url' => $hotspot->video_url,
-                    'scene_id' => $hotspot->scene_id
-                ];
+            // Intentar obtener desde caché primero
+            $formattedHotspots = Cache::remember('hotspots.json', 300, function () {
+                $hotspots = Hotspot::select([
+                    'id', 
+                    'pitch', 
+                    'yaw', 
+                    'type', 
+                    'title', 
+                    'text',
+                    'model_url',
+                    'audio_url',
+                    'video_url',
+                    'scene_id'
+                ])
+                ->orderBy('type')
+                ->get();
+
+                return $hotspots->map(function ($hotspot) {
+                    return [
+                        'id' => $hotspot->id,
+                        'pitch' => (float) $hotspot->pitch,
+                        'yaw' => (float) $hotspot->yaw,
+                        'type' => $hotspot->type,
+                        'title' => $hotspot->title,
+                        'text' => $hotspot->text,
+                        'model_url' => $hotspot->model_url,
+                        'audio_url' => $hotspot->audio_url,
+                        'video_url' => $hotspot->video_url,
+                        'scene_id' => $hotspot->scene_id
+                    ];
+                });
             });
 
             return response()->json($formattedHotspots);
